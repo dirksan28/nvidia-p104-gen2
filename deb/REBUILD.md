@@ -131,9 +131,13 @@ Expected, and all of it matters:
 
 * `Package: nvidia-srv-p104-gen2`, `Architecture: all`
 * `Version: 580.178.04-1`
-* `Depends: nvidia-dkms-580-server (>= 580.178.04), dkms, initramfs-tools-core | initramfs-tools | dracut`
+* `Depends: nvidia-dkms-580-server (>= 580.178.04), nvidia-dkms-580-server (<< 580.178.05), dkms, initramfs-tools-core | initramfs-tools | dracut`
   — **do not depend on `initramfs-tools` alone**: this host uses `dracut`, and a
   hard dependency on `initramfs-tools` makes `dpkg -i` fail before anything runs.
+  The upper bound is equally load-bearing: with `>=` alone, apt can upgrade to
+  580.190, where the version-named DKMS override no longer matches and the
+  patch silently stops being applied. The range accepts any packaging revision
+  of upstream 580.178.04 but no later driver.
 * No `Pre-Depends`, no maintainer scripts other than `postinst`/`prerm`/`postrm`.
 
 Also confirm:
@@ -303,7 +307,7 @@ Expected places to touch:
 
 | Place | Change |
 |---|---|
-| `deb/packaging/DEBIAN/control` | `Version`, `Depends: nvidia-dkms-<newmajor>-server (>= <newver>)`, description text that names the override path |
+| `deb/packaging/DEBIAN/control` | `Version`, both `Depends` bounds on `nvidia-dkms-<newmajor>-server` (`>= <newver>`, `<< <next upstream version>`), description text that names the override path |
 | `deb/packaging/DEBIAN/postinst` | `VER=<newver>` (and `MOD=` if the DKMS module name changed) |
 | `deb/packaging/DEBIAN/postrm` | same `VER=` |
 | `deb/packaging/etc/dkms/nvidia-srv-<newver>.conf` | rename the file; update the comment that explains the index |
