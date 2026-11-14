@@ -315,7 +315,7 @@ Expected places to touch:
 | `deb/packaging/usr/share/doc/nvidia-srv-p104-gen2/README` | paths/version in the text |
 | `deb/readme.txt` | paths/version in the text |
 | `deb/nvidia-srv-p104-gen2_<newver>-1_all.deb` | output filename |
-| `../patch/*` | regenerate the patch against the new source tree (`../patch/README.md`) |
+| `../patch/*` | regenerate the patch against the new source tree (`../patch/AGENT_PROMPT.md` §12) |
 
 Then rerun Steps 2–9. `SRC=/usr/src/$MOD-$VER` in both scripts derives the
 source path automatically, so only `MOD`/`VER` need editing.

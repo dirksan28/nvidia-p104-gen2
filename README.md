@@ -66,7 +66,7 @@ ls -d /usr/src/nvidia-srv-* 2>/dev/null     # DKMS source tree present?
 | You have | Do this |
 |---|---|
 | driver 580.178.04 and `/usr/src/nvidia-srv-580.178.04` | install the package, below |
-| another driver version | don't install it — regenerate the patch against your tree: `deb/readme.txt` (*REBUILDING FOR A NEW DRIVER VERSION*) and `patch/README.md` (*Regenerating the patch*) |
+| another driver version | don't install it — regenerate the patch against your tree: `deb/readme.txt` (*REBUILDING FOR A NEW DRIVER VERSION*) and `patch/AGENT_PROMPT.md` (*Rebasing for another driver version*) |
 | no NVIDIA driver | install the pinned driver below, reboot, then install the package |
 
 ### Install the exact driver version
@@ -129,7 +129,7 @@ Removal is `sudo dpkg -r nvidia-srv-p104-gen2`, which rebuilds and reinstalls
 the stock module. Full preconditions, Secure Boot notes and troubleshooting are
 in `deb/readme.txt`. To rebuild the package for another driver, follow
 `deb/REBUILD.md`; to understand or re-derive the patch itself, read
-`patch/README.md` and `patch/doTheGen2Patch.md`.
+`patch/README.md` and `patch/AGENT_PROMPT.md`.
 
 ## Contents
 
@@ -145,8 +145,8 @@ nvidia-p104-gen2/
 ├── AGENTS.md  working agreement for anyone changing the repository
 ├── RELEASE_NOTES.md  install/verify/remove notes for a tagged release
 ├── patch/    all sources and tooling that produce the kernel patch
-│   ├── README.md              index, provenance, how the patch is regenerated
-│   ├── doTheGen2Patch.md      full reproduction guide (manual path + package)
+│   ├── README.md              directory map, three paths, tree verification
+│   ├── AGENT_PROMPT.md        task prompt: apply or re-derive the patch
 │   ├── p104-gen2.patch        canonical -p1 patch
 │   ├── final.patch            same change as .bak → file (manual procedure)
 │   ├── source/pristine/       untouched driver sources (580.178.04)

@@ -15,8 +15,7 @@ License in LICENSE:
   * the Debian packaging in deb/packaging/ (control, maintainer scripts,
     DKMS override, systemd drop-in);
   * the tools in patch/tools/ (mmio_test.c, linktest.sh, dump.sh,
-    rollback.sh) and the copies of two of them embedded in the appendices of
-    patch/doTheGen2Patch.md.
+    rollback.sh, bwtest.cu).
 
   Copyright (c) 2026 The nvidia-p104-gen2 authors.
 

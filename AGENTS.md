@@ -10,12 +10,12 @@ not duplicate it here, and do not contradict it.
 | Order | File | Why |
 |---|---|---|
 | 1 | `README.md` | What the project ships and the measured result it claims |
-| 2 | `patch/README.md` | Tree invariants, checksums, tool index, measured behaviour |
-| 3 | `patch/doTheGen2Patch.md` §1, §11 | Register facts, why the registry keys fail, why the code looks like this |
+| 2 | `patch/README.md` | Directory map, three paths, checksums and tree verification |
+| 3 | `patch/AGENT_PROMPT.md` §11 | Register facts, why the registry keys fail, why the code looks like this |
 | 4 | `deb/REBUILD.md` | Step-by-step build/install/remove runbook — follow it, don't improvise |
 
 `deb/REBUILD.md` is written as a task prompt and is the authority on packaging.
-`patch/doTheGen2Patch.md` is the authority on hardware behaviour. If a change
+`patch/AGENT_PROMPT.md` is the authority on hardware behaviour. If a change
 makes either one wrong, update it in the same change.
 
 ## What is authoritative
@@ -136,8 +136,8 @@ every CUDA client (any container or process using the GPU, plus `nvtop`); the
 - Timing lives in `#define`s: `NV_P104_GEN2_TICK_MS` (250),
   `NV_P104_GEN2_SETTLE_MS` (10), `NV_P104_GEN2_SETTLE_TRIES` (6). 250 ms is the
   validated value; changing any of them requires re-running the load
-  measurement and updating the "Measured behaviour" table in `patch/README.md`
-  and the figures in `deb/readme.txt`.
+  measurement and updating the "Measured behaviour" table in
+  `patch/AGENT_PROMPT.md` §11.3 and the figures in `deb/readme.txt`.
 - Do not replace the settle loop with a fixed `msleep`: the first retrain of a
   round only latches the register, so a second attempt is required. That is
   why the loop re-checks `LNKSTA` and retries.
@@ -160,7 +160,7 @@ perturb what it measures.
 - A synthetic LLM load must use **unique prompts**. Identical prompts hit
   llama-server's prefix cache and will not reproduce the Gen1 flap.
 - Gen1 windows under load are expected: the RM re-asserts Gen1 ~0.25 s into each
-  burst and cannot be vetoed on GP104 (`doTheGen2Patch.md` §1.2). Do not "fix"
+  burst and cannot be vetoed on GP104 (`AGENT_PROMPT.md` §11.2). Do not "fix"
   this by adding registry parameters, clock locking or more retries — all were
   tested and are ineffective or unsupported.
 
