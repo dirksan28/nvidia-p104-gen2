@@ -1,0 +1,15 @@
+#!/bin/bash
+# prerm for nvidia-srv-p104-gen2
+#
+# The module itself is rebuilt in postrm, after dpkg has removed the DKMS
+# override and the patch file. Here we only release the GPU so the reload
+# there can succeed.
+set -u
+
+case "${1:-}" in
+    remove|upgrade|deconfigure)
+        systemctl stop nvidia-persistenced >/dev/null 2>&1 || true
+        ;;
+esac
+
+exit 0

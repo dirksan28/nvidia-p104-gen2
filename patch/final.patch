@@ -1,0 +1,286 @@
+--- nvidia/nv-pci.c.bak
++++ nvidia/nv-pci.c
+@@ -32,6 +32,9 @@
+ #include "nv-vgpu-vfio-interface.h"
+ #endif
+ #include <linux/iommu.h>
++#include <linux/io.h>
++#include <linux/delay.h>
++#include <linux/kthread.h>
+ 
+ #if defined(NV_SEQ_READ_ITER_PRESENT)
+ #include <linux/seq_file.h>
+@@ -249,6 +252,215 @@
+     return NV_TRUE;
+ }
+ 
++static void nv_p104_write_bar0(void __iomem *bar0)
++{
++    u32 val;
++
++    /* 1. Unlock BAR0 XVE/XP_PL Gen2 capability declarations */
++    iowrite32(0x6, bar0 + 0x8872C);
++    iowrite32(ioread32(bar0 + 0x2241C) | 0x81, bar0 + 0x2241C);
++    iowrite32(ioread32(bar0 + 0x8841C) & ~0x6000, bar0 + 0x8841C);
++    iowrite32(ioread32(bar0 + 0x8C2C0) & ~0x4, bar0 + 0x8C2C0);
++    iowrite32(ioread32(bar0 + 0x8C300) & ~0x10, bar0 + 0x8C300);
++
++    /* 2. LINK_CONFIG_0 (0x8C040) SPEED = 1 (5.0 GT/s) */
++    val = (ioread32(bar0 + 0x8C040) & ~(0x3U << 18)) | (0x1U << 18);
++    iowrite32(val, bar0 + 0x8C040);
++
++    /* 3. NV_XP_PL_LCTRL_2 (0x8C1C0): target 5.0 GT/s */
++    val = (ioread32(bar0 + 0x8C1C0) & ~(0xFU << 16)) | (0x2U << 16);
++    iowrite32(val, bar0 + 0x8C1C0);
++
++    iowrite32((ioread32(bar0 + 0x88610) & ~0x1000U) | 0x1U, bar0 + 0x88610);
++
++    /* Flush posted MMIO writes before triggering link retrain */
++    (void)ioread32(bar0 + 0x8872C);
++}
++
++/*
++ * The Resource Manager re-asserts its own 2.5 GT/s setting (it rewrites
++ * LINK_CONFIG_0) roughly 0.25 s into every burst of GPU work, i.e. as soon as
++ * the link itself goes quiet while the GPU is in P0. A one-shot unlock does
++ * not hold; the correction has to be re-applied once per burst.
++ *
++ * Measured cost of the downshift is entirely the detection latency, so poll
++ * fast: one PCIe config read every 250 ms while the link is already at
++ * 5.0 GT/s, which is 4 reads/s and negligible.
++ *
++ * Within a round the first retrain only latches LINK_CONFIG_0; the second one
++ * is what actually trains at 5.0 GT/s. So the settle window per attempt is
++ * short: waiting longer for the first retrain just stretches the window.
++ */
++#define NV_P104_GEN2_TICK_MS      250
++#define NV_P104_GEN2_SETTLE_MS     10
++#define NV_P104_GEN2_SETTLE_TRIES   6   /* 60 ms upper bound per attempt */
++
++static struct task_struct *nv_p104_gen2_task;
++static NvBool nv_p104_gen2_logged = NV_FALSE;
++
++static int nv_p104_gen2_watchdog(void *unused)
++{
++    while (!kthread_should_stop()) {
++        struct pci_dev *dev = pci_get_device(0x10de, 0x1b87, NULL);
++
++        if (dev != NULL) {
++            nv_force_p104_gen2(dev);
++            pci_dev_put(dev);
++        }
++
++        msleep(NV_P104_GEN2_TICK_MS);
++    }
++
++    return 0;
++}
++
++static void nv_p104_gen2_start_watchdog(void)
++{
++    if (nv_p104_gen2_task != NULL)
++        return;
++
++    nv_p104_gen2_task = kthread_run(nv_p104_gen2_watchdog, NULL,
++                                    "nv-p104-gen2-wd");
++    if (IS_ERR(nv_p104_gen2_task)) {
++        nv_printf(NV_DBG_ERRORS,
++                  "NVRM: failed to start P104-100 Gen2 watchdog\n");
++        nv_p104_gen2_task = NULL;
++    }
++}
++
++static void nv_p104_gen2_stop_watchdog(void)
++{
++    if (nv_p104_gen2_task == NULL)
++        return;
++
++    kthread_stop(nv_p104_gen2_task);
++    nv_p104_gen2_task = NULL;
++}
++
++/*
++ * P104-100 (10de:1b87) PCIe Gen2 unlock.
++ *
++ * The P104-100 restricts its PCIe link to 2.5 GT/s through GPU state rather
++ * than through anything visible in PCIe config space, so re-declare 5.0 GT/s
++ * as the capability in the BAR0 XVE/XP_PL registers, request 5.0 GT/s as the
++ * target link speed, and retrain the link via PCIe config space.
++ *
++ * The Resource Manager resets this state on adapter init / teardown, so this
++ * helper is called both from probe and right after rm_init_adapter(). A single
++ * retrain right after adapter init frequently does not take, hence the retry
++ * loop. The writes are idempotent and the function is a no-op once the link is
++ * already running at 5.0 GT/s.
++ */
++void nv_force_p104_gen2(struct pci_dev *dev)
++{
++    void __iomem *bar0;
++    struct pci_dev *root;
++    resource_size_t bar0_phys;
++    resource_size_t bar0_len;
++    u16 lnksta = 0;
++    int attempt;
++    int settle;
++
++    if (!dev || dev->vendor != 0x10de || dev->device != 0x1b87)
++        return;
++
++    /* Already at 5.0 GT/s (Gen2 == 0x2 in bits [3:0])? */
++    pcie_capability_read_word(dev, PCI_EXP_LNKSTA, &lnksta);
++    if ((lnksta & PCI_EXP_LNKSTA_CLS) == PCI_EXP_LNKSTA_CLS_5_0GB)
++        return;
++
++    root = (dev->bus && dev->bus->self) ? dev->bus->self : NULL;
++    if (root && pci_pcie_type(root) != PCI_EXP_TYPE_ROOT_PORT)
++        root = NULL;
++
++    bar0_phys = pci_resource_start(dev, 0);
++    bar0_len  = pci_resource_len(dev, 0);
++    if (!bar0_phys || bar0_len < 0x100000)
++        return;
++
++    bar0 = ioremap(bar0_phys, 0x100000);
++    if (!bar0) {
++        pci_warn(dev, "P104-100: failed to ioremap BAR0 for Gen2 unlock\n");
++        return;
++    }
++
++    /* BAR does not decode while the GPU is powered down: do not poke it. */
++    if (ioread32(bar0 + 0x8C040) == 0xFFFFFFFF) {
++        iounmap(bar0);
++        return;
++    }
++
++    for (attempt = 0; attempt < 6; attempt++) {
++        /*
++         * The previous attempt's link training may simply still be settling.
++         * Re-check before clobbering the registers again; retraining a link
++         * that is already coming up only adds another link-down event.
++         */
++        if (attempt > 0) {
++            pcie_capability_read_word(dev, PCI_EXP_LNKSTA, &lnksta);
++            if ((lnksta & PCI_EXP_LNKSTA_CLS) == PCI_EXP_LNKSTA_CLS_5_0GB)
++                break;
++        }
++
++        /*
++         * The Resource Manager can revert the BAR0 link state between
++         * attempts, so rewrite it before every retrain.
++         */
++        nv_p104_write_bar0(bar0);
++
++        /* Target 5.0 GT/s on the GPU and its upstream root port */
++        pcie_capability_clear_and_set_word(dev, PCI_EXP_LNKCTL2,
++                                           PCI_EXP_LNKCTL2_TLS,
++                                           PCI_EXP_LNKCTL2_TLS_5_0GT);
++        if (root) {
++            pcie_capability_clear_and_set_word(root, PCI_EXP_LNKCTL2,
++                                               PCI_EXP_LNKCTL2_TLS,
++                                               PCI_EXP_LNKCTL2_TLS_5_0GT);
++        }
++
++        if (root)
++            pcie_capability_set_word(root, PCI_EXP_LNKCTL, PCI_EXP_LNKCTL_RL);
++        pcie_capability_set_word(dev, PCI_EXP_LNKCTL, PCI_EXP_LNKCTL_RL);
++
++        /*
++         * Poll rather than sleeping a fixed 250 ms: the link normally settles
++         * in a few tens of milliseconds, and every millisecond between the
++         * Resource Manager's downgrade and this retrain is a millisecond the
++         * link spends at 2.5 GT/s. Same 250 ms upper bound per attempt.
++         */
++        for (settle = 0; settle < NV_P104_GEN2_SETTLE_TRIES; settle++) {
++            msleep(NV_P104_GEN2_SETTLE_MS);
++            pcie_capability_read_word(dev, PCI_EXP_LNKSTA, &lnksta);
++            if ((lnksta & PCI_EXP_LNKSTA_CLS) == PCI_EXP_LNKSTA_CLS_5_0GB) {
++                pci_dbg(dev,
++                        "nv-p104-gen2: attempt %d reached 5.0 GT/s after %d ms\n",
++                        attempt + 1,
++                        (settle + 1) * NV_P104_GEN2_SETTLE_MS);
++                break;
++            }
++        }
++
++        if ((lnksta & PCI_EXP_LNKSTA_CLS) == PCI_EXP_LNKSTA_CLS_5_0GB)
++            break;
++    }
++
++    iounmap(bar0);
++
++    if ((lnksta & PCI_EXP_LNKSTA_CLS) == PCI_EXP_LNKSTA_CLS_5_0GB) {
++        if (!nv_p104_gen2_logged) {
++            nv_p104_gen2_logged = NV_TRUE;
++            pci_info(dev, "P104-100: PCIe Gen2 unlock applied, LNKSTA=0x%04x (Speed=%u, Width=x%u)\n",
++                     lnksta,
++                     lnksta & PCI_EXP_LNKSTA_CLS,
++                     (lnksta & PCI_EXP_LNKSTA_NLW) >> PCI_EXP_LNKSTA_NLW_SHIFT);
++        } else {
++            pci_dbg(dev, "P104-100: Gen2 re-applied, LNKSTA=0x%04x\n", lnksta);
++        }
++    } else {
++        pci_dbg(dev, "P104-100: link did not reach 5.0 GT/s, LNKSTA=0x%04x\n", lnksta);
++    }
++}
++
+ /* find nvidia devices and set initial state */
+ static int
+ nv_pci_probe
+@@ -548,6 +760,12 @@
+ 
+     nv_check_and_exclude_gpu(sp, nv);
+ 
++    /* P104-100: unlock PCIe Gen2 while BAR0 is still accessible */
++    if (nvl->pci_dev->device == 0x1b87) {
++        nv_force_p104_gen2(nvl->pci_dev);
++        nv_p104_gen2_start_watchdog();
++    }
++
+ #if defined(DPM_FLAG_NO_DIRECT_COMPLETE)
+     dev_pm_set_driver_flags(nvl->dev, DPM_FLAG_NO_DIRECT_COMPLETE);
+ #elif defined(DPM_FLAG_NEVER_SKIP)
+@@ -1091,6 +1309,7 @@
+     {
+         return;
+     }
++    nv_p104_gen2_stop_watchdog();
+     return pci_unregister_driver(&nv_pci_driver);
+ }
+ 
+--- nvidia/nv.c.bak
++++ nvidia/nv.c
+@@ -105,6 +105,9 @@
+ #include "conftest/patches.h"
+ #include "detect-self-hosted.h"
+ 
++/* Implemented in nv-pci.c: P104-100 PCIe Gen2 unlock */
++void nv_force_p104_gen2(struct pci_dev *dev);
++
+ #define RM_THRESHOLD_TOTAL_IRQ_COUNT     100000
+ #define RM_THRESHOLD_UNAHNDLED_IRQ_COUNT 99900
+ #define RM_UNHANDLED_TIMEOUT_US          100000
+@@ -1474,6 +1477,13 @@
+         goto failed_release_irq;
+     }
+ 
++    /*
++     * P104-100: rm_init_adapter() has just re-initialized the link state;
++     * re-apply the Gen2 unlock so the adapter comes up at 5.0 GT/s.
++     */
++    if (nvl != NULL && nvl->pci_dev != NULL)
++        nv_force_p104_gen2(nvl->pci_dev);
++
+     {
+         const NvU8 *uuid = rm_get_gpu_uuid_raw(sp, nv);
+ 
+--- common/inc/nv-pci.h.bak
++++ common/inc/nv-pci.h
+@@ -38,4 +38,8 @@
+ nv_linux_state_t * find_pci(NvU32, NvU8, NvU8, NvU8);
+ NvBool nv_pci_is_valid_topology_for_direct_pci(nv_state_t *, struct pci_dev *);
+ NvBool nv_pci_has_common_pci_switch(nv_state_t *nv, struct pci_dev *);
++
++/* Implemented in nv-pci.c: P104-100 PCIe Gen2 unlock */
++void nv_force_p104_gen2(struct pci_dev *dev);
++
+ #endif

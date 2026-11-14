@@ -1,0 +1,74 @@
+#!/bin/bash
+# postrm for nvidia-srv-p104-gen2
+#
+# Runs after dpkg has removed /etc/dkms/nvidia-srv-580.178.04.conf and the
+# patch file, so a rebuild here produces the stock module again.
+set -u
+
+PKG=nvidia-srv-p104-gen2
+MOD=nvidia-srv
+VER=580.178.04
+KREL=$(uname -r)
+SRC=/usr/src/$MOD-$VER
+
+log() { echo "$PKG: $*" >&2; }
+
+update_initramfs() {
+    local k=$1
+    if command -v update-initramfs >/dev/null 2>&1; then
+        update-initramfs -u -k "$k" || log "update-initramfs failed (non-fatal)."
+    elif command -v dracut >/dev/null 2>&1; then
+        dracut --force "/boot/initrd.img-$k" "$k" || log "dracut failed (non-fatal)."
+    elif command -v mkinitcpio >/dev/null 2>&1; then
+        mkinitcpio -P || log "mkinitcpio failed (non-fatal)."
+    fi
+}
+
+maybe_reload() {
+    systemctl stop nvidia-persistenced >/dev/null 2>&1 || true
+
+    if fuser -s /dev/nvidia* 2>/dev/null; then
+        log "GPU device nodes are in use; not reloading the driver."
+        systemctl start nvidia-persistenced >/dev/null 2>&1 || true
+        return 1
+    fi
+
+    if ! modprobe -r nvidia_uvm nvidia_drm nvidia_modeset nvidia >/dev/null 2>&1; then
+        log "could not unload the NVIDIA modules."
+        systemctl start nvidia-persistenced >/dev/null 2>&1 || true
+        return 1
+    fi
+
+    if ! modprobe nvidia >/dev/null 2>&1; then
+        log "could not load the stock module."
+        return 1
+    fi
+
+    systemctl start nvidia-persistenced >/dev/null 2>&1 || true
+    return 0
+}
+
+case "${1:-}" in
+    remove|purge)
+        if [ -r "$SRC/dkms.conf" ]; then
+            log "rebuilding stock module for kernel $KREL ..."
+            if dkms build -m "$MOD" -v "$VER" -k "$KREL" --force; then
+                dkms install -m "$MOD" -v "$VER" -k "$KREL" --force \
+                    || log "dkms install failed."
+                update_initramfs "$KREL"
+            else
+                log "stock rebuild FAILED; the previously built module remains installed."
+            fi
+        fi
+
+        systemctl daemon-reload >/dev/null 2>&1 || true
+
+        if maybe_reload; then
+            log "stock module restored."
+        else
+            log "reboot to return to the stock driver behaviour."
+        fi
+        ;;
+esac
+
+exit 0

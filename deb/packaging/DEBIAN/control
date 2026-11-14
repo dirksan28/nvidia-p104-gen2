@@ -1,0 +1,22 @@
+Package: nvidia-srv-p104-gen2
+Version: 580.178.04-1
+Section: kernel
+Priority: optional
+Architecture: all
+Depends: nvidia-dkms-580-server (>= 580.178.04), dkms, initramfs-tools-core | initramfs-tools | dracut
+Maintainer: local <root@localhost>
+Description: PCIe Gen2 x4 unlock for NVIDIA P104-100 (10de:1b87)
+ Patches the out-of-tree NVIDIA kernel module so a P104-100 negotiates
+ 5.0 GT/s (PCIe Gen2) instead of the stock 2.5 GT/s, by re-declaring the
+ capability in the BAR0 XVE/XP_PL registers and retraining the link.
+ .
+ The change is applied by DKMS at build time through
+ /etc/dkms/nvidia-srv-580.178.04.conf, so it survives kernel updates.
+ It adds a probe hook, a post-rm_init_adapter() hook and a 1 s watchdog
+ that re-applies the unlock when the Resource Manager downgrades the idle
+ link, and installs a nvidia-persistenced drop-in so the adapter stays
+ initialized (the stock unit runs --no-persistence-mode, which makes every
+ nvidia-smi re-initialize the adapter and reset the link).
+ .
+ The package can be removed with 'dpkg -r nvidia-srv-p104-gen2', which
+ rebuilds and reinstall the stock module and drops the drop-in.

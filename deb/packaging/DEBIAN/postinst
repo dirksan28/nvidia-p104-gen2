@@ -1,0 +1,98 @@
+#!/bin/bash
+# postinst for nvidia-srv-p104-gen2
+set -u
+
+PKG=nvidia-srv-p104-gen2
+MOD=nvidia-srv
+VER=580.178.04
+KREL=$(uname -r)
+SRC=/usr/src/$MOD-$VER
+
+log() { echo "$PKG: $*" >&2; }
+
+update_initramfs() {
+    local k=$1
+    if command -v update-initramfs >/dev/null 2>&1; then
+        update-initramfs -u -k "$k" || log "update-initramfs failed (non-fatal)."
+    elif command -v dracut >/dev/null 2>&1; then
+        dracut --force "/boot/initrd.img-$k" "$k" || log "dracut failed (non-fatal)."
+    elif command -v mkinitcpio >/dev/null 2>&1; then
+        mkinitcpio -P || log "mkinitcpio failed (non-fatal)."
+    fi
+}
+
+maybe_reload() {
+    systemctl stop nvidia-persistenced >/dev/null 2>&1 || true
+
+    if fuser -s /dev/nvidia* 2>/dev/null; then
+        log "GPU device nodes are in use; not reloading the driver."
+        systemctl start nvidia-persistenced >/dev/null 2>&1 || true
+        return 1
+    fi
+
+    if ! modprobe -r nvidia_uvm nvidia_drm nvidia_modeset nvidia >/dev/null 2>&1; then
+        log "could not unload the NVIDIA modules."
+        systemctl start nvidia-persistenced >/dev/null 2>&1 || true
+        return 1
+    fi
+
+    if ! modprobe nvidia >/dev/null 2>&1; then
+        log "could not load the patched module."
+        return 1
+    fi
+
+    systemctl start nvidia-persistenced >/dev/null 2>&1 || true
+    return 0
+}
+
+case "${1:-}" in
+    configure)
+        if [ ! -r "$SRC/dkms.conf" ]; then
+            log "$SRC not found; install nvidia-dkms-580-server $VER first."
+            exit 1
+        fi
+
+        if ! dkms status -m "$MOD" -v "$VER" 2>/dev/null | grep -q "$MOD"; then
+            log "DKMS module $MOD/$VER is not registered."
+            exit 1
+        fi
+
+        log "building patched module for kernel $KREL ..."
+        if ! dkms build -m "$MOD" -v "$VER" -k "$KREL" --force; then
+            log "dkms build FAILED. See /var/lib/dkms/$MOD/$VER/$KREL/*/log/make.log"
+            log "The previously installed module is untouched."
+            exit 1
+        fi
+
+        if ! dkms install -m "$MOD" -v "$VER" -k "$KREL" --force; then
+            log "dkms install FAILED."
+            exit 1
+        fi
+
+        # Refuse to proceed with a module that does not actually contain the
+        # patch. DKMS deletes its build directory, so check the installed .ko.
+        if ! zstd -dc "/lib/modules/$KREL/updates/dkms/nvidia.ko.zst" 2>/dev/null \
+                | grep -qa 'P104-100:'; then
+            log "ERROR: installed module does not contain the P104-100 code;"
+            log "check /etc/dkms/$MOD-$VER.conf and $SRC/patches/p104-gen2.patch."
+            log "Rebuild by hand or remove this package; not reloading the driver."
+            exit 1
+        fi
+
+        log "patched module installed."
+
+        update_initramfs "$KREL"
+
+        systemctl daemon-reload >/dev/null 2>&1 || true
+
+        if maybe_reload; then
+            log "NVIDIA modules reloaded with the patch."
+        else
+            log "reboot (or reload the nvidia module) to activate the patch."
+        fi
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+esac
+
+exit 0

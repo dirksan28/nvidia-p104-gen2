@@ -1,0 +1,60 @@
+nvidia-p104-gen2 — copyright and third-party notices
+=====================================================
+
+This repository contains work in two copyright classes.
+
+1. Original work — MIT
+----------------------
+
+Everything not listed under (2) is original work, licensed under the MIT
+License in LICENSE:
+
+  * the code this project adds (nv_p104_write_bar0(), nv_force_p104_gen2(),
+    the watchdog, the probe / post-rm_init_adapter hooks);
+  * the documentation in README.md, patch/*.md and deb/readme.txt;
+  * the Debian packaging in deb/packaging/ (control, maintainer scripts,
+    DKMS override, systemd drop-in);
+  * the tools in patch/tools/ (mmio_test.c, linktest.sh, dump.sh,
+    rollback.sh) and the copies of two of them embedded in the appendices of
+    patch/doTheGen2Patch.md.
+
+  Copyright (c) 2026 The nvidia-p104-gen2 authors.
+
+2. NVIDIA open kernel-module source — MIT, redistributed
+--------------------------------------------------------
+
+patch/source/pristine/ and patch/source/patched/ each contain three files
+taken from the NVIDIA open GPU kernel modules version 580.178.04, as shipped
+by the Ubuntu package nvidia-dkms-580-server 580.178.04-0ubuntu0.26.04.1:
+
+    nvidia/nv-pci.c          SPDX-FileCopyrightText: Copyright (c) 2019-2025
+                             NVIDIA CORPORATION & AFFILIATES.
+                             SPDX-License-Identifier: MIT
+    nvidia/nv.c              SPDX-FileCopyrightText: Copyright (c) 1999-2025
+                             NVIDIA CORPORATION & AFFILIATES.
+                             SPDX-License-Identifier: MIT
+    common/inc/nv-pci.h      SPDX-FileCopyrightText: Copyright (c) 2019-2025
+                             NVIDIA CORPORATION & AFFILIATES.
+                             SPDX-License-Identifier: MIT
+
+Each file keeps its original copyright and permission notice in its header.
+They are redistributed unmodified in source/pristine/, and with this project's
+modifications in source/patched/. The modifications are the original work
+described under (1).
+
+The unified diffs (patch/p104-gen2.patch, patch/final.patch and
+patch/diffs/*.diff) quote lines from those files as diff context. The quoted
+lines remain NVIDIA's under the same MIT terms.
+
+The MIT text that applies to both classes is reproduced verbatim in the header
+of every affected NVIDIA file and in LICENSE.
+
+3. Not distributed here
+-----------------------
+
+The NVIDIA driver itself — the kernel module blobs and userspace libraries
+installed by nvidia-driver-580-server / nvidia-dkms-580-server — is not part
+of this repository and is not redistributed by it. The instructions in
+deb/readme.txt install that driver from the distribution archive, and your use
+of it is governed by the NVIDIA Software License that comes with it. The MIT
+grant above covers only this repository's contents.
