@@ -95,7 +95,8 @@ before rebuilding for a newer driver.
 ### Install the package
 
 From a release, download `nvidia-srv-p104-gen2_580.178.04-1_all.deb` from the
-[Releases page](../../releases/latest), then:
+[Releases page](https://github.com/dirksan28/nvidia-p104-gen2/releases/latest),
+then:
 
 ```bash
 sudo apt install ./nvidia-srv-p104-gen2_580.178.04-1_all.deb
@@ -148,7 +149,6 @@ nvidia-p104-gen2/
 │   ├── README.md              directory map, three paths, tree verification
 │   ├── AGENT_PROMPT.md        task prompt: apply or re-derive the patch
 │   ├── p104-gen2.patch        canonical -p1 patch
-│   ├── final.patch            same change as .bak → file (manual procedure)
 │   ├── source/pristine/       untouched driver sources (580.178.04)
 │   ├── source/patched/        same files with the patch applied
 │   ├── diffs/                 per-file pieces of the patch

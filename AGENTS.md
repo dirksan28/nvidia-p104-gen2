@@ -25,7 +25,6 @@ makes either one wrong, update it in the same change.
 | `patch/p104-gen2.patch` | **Canonical patch.** 286 lines, `a/`/`b/` prefixes, applies with `patch -p1` to the driver source root |
 | `patch/source/patched/` | The three files exactly as validated on hardware; the patch must reproduce them byte for byte |
 | `patch/source/pristine/` | Untouched 580.178.04 sources; the patch is anchored to these |
-| `patch/final.patch` | Same change as `.bak` → file (`-p0`), for the manual procedure; must stay content-equivalent |
 | `patch/diffs/p1-part{1,2,3}.diff` | Per-file pieces concatenated into the canonical patch |
 | `deb/packaging/usr/src/.../patches/p104-gen2.patch` | Copy shipped in the `.deb`; must be identical to the canonical patch |
 | `deb/readme.txt` | Single source for the shipped doc; `packaging/usr/share/doc/.../README` must be identical |
@@ -49,9 +48,9 @@ makes either one wrong, update it in the same change.
    byte for byte.** Offsets, fuzz or a `cmp` mismatch mean the tree has
    diverged — fix that before building anything.
 5. **Change one thing, change all of it.** A code edit is only half done until
-   the canonical patch, `final.patch`, `diffs/`, the stored sources, the
-   checksums in `patch/README.md`, the packaged copy and the rebuilt `.deb`
-   agree. Partial updates are this repository's main failure mode.
+   the canonical patch, `diffs/`, the stored sources, the checksums in
+   `patch/README.md`, the packaged copy and the rebuilt `.deb` agree. Partial
+   updates are this repository's main failure mode.
 6. **Version lockstep.** `580.178.04` appears in the package `Version`, both
    maintainer scripts, the DKMS override filename, the `usr/src` directory
    name, the `.deb` filename and the docs. Enumerate with
@@ -106,16 +105,6 @@ dpkg -V nvidia-srv-p104-gen2 && dpkg -V nvidia-dkms-580-server
 zstd -dc /lib/modules/$(uname -r)/updates/dkms/nvidia.ko.zst | strings | grep -c 'P104-100:'
 ps -eo comm | grep nv-p104-gen2-wd
 cat /sys/bus/pci/devices/0000:01:00.0/current_link_speed
-```
-
-Regenerating `final.patch` (after editing the stored sources) is a diff, not a
-hand edit:
-
-```bash
-cd patch
-for f in nvidia/nv-pci.c nvidia/nv.c common/inc/nv-pci.h; do
-    diff -u --label "$f.bak" --label "$f" "source/pristine/$f" "source/patched/$f"
-done > final.patch || true          # diff exits 1 when the files differ
 ```
 
 ## Build, install, remove

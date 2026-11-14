@@ -25,7 +25,6 @@ Verified against `nvidia-srv` 580.178.04 on Ubuntu 26.04, kernel
 |---|---|
 | `AGENT_PROMPT.md` | The task prompt: phases A–H, expected output, gates, rollback, report template, plus the register facts and measured behaviour. Self-contained apart from the tool sources and the patch file. |
 | `p104-gen2.patch` | **Canonical change** (286 lines, `a/`–`b/` prefixes, `patch -p1`). This is the file shipped inside the `.deb`. |
-| `final.patch` | The same change as `.bak` → file (no prefixes), for a tree edited by hand. Generated from the same sources. |
 | `diffs/p1-part{1,2,3}.diff` | The three per-file pieces concatenated into `p104-gen2.patch`. |
 | `source/pristine/` | The three 580.178.04 driver files exactly as shipped. |
 | `source/patched/` | The same files with the patch applied — the state validated on hardware. |
@@ -130,15 +129,6 @@ done
 for f in nvidia/nv-pci.c nvidia/nv.c common/inc/nv-pci.h; do
     cmp "$T/$f" "source/patched/$f"
 done
-```
-
-Regenerate `final.patch` from the stored sources (never hand-edit it):
-
-```bash
-cd patch
-for f in nvidia/nv-pci.c nvidia/nv.c common/inc/nv-pci.h; do
-    diff -u --label "$f.bak" --label "$f" "source/pristine/$f" "source/patched/$f"
-done > final.patch || true          # diff exits 1 when the files differ
 ```
 
 ## Changing this directory

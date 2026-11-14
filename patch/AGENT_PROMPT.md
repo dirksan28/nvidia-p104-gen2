@@ -567,8 +567,11 @@ not include it, hence the local prototype there (which also keeps
 cd /usr/src/nvidia-srv-580.178.04
 { diff -u nvidia/nv-pci.c.bak nvidia/nv-pci.c
   diff -u nvidia/nv.c.bak nvidia/nv.c
-  diff -u common/inc/nv-pci.h.bak common/inc/nv-pci.h; } > /tmp/p104-gen2/final.patch
+  diff -u common/inc/nv-pci.h.bak common/inc/nv-pci.h; } > /tmp/p104-gen2/review.diff
 ```
+
+This scratch diff is for reading only; `p104-gen2.patch` remains the
+authoritative change.
 
 Expected shape: 3 include lines, 219 added lines in `nv-pci.c`, a 6-line probe
 hook, a 1-line unregister hook, 10 lines in `nv.c`, 4 lines in `nv-pci.h`. The
@@ -860,10 +863,10 @@ diff -u --label a/common/inc/nv-pci.h --label b/common/inc/nv-pci.h "$S/common/i
 cat diffs/p1-part1.diff diffs/p1-part2.diff diffs/p1-part3.diff > p104-gen2.patch
 ```
 
-Refresh `source/patched/` from `$T`, `source/pristine/` from `$S`, regenerate
-`final.patch` with the recipe in [`README.md`](README.md), update the checksums
-there, then bump the package in lockstep: `../deb/REBUILD.md` ("Bumping the
-driver version") lists every place that mentions the version.
+Refresh `source/patched/` from `$T`, `source/pristine/` from `$S`, update the
+checksums in [`README.md`](README.md), then bump the package in lockstep:
+`../deb/REBUILD.md` ("Bumping the driver version") lists every place that
+mentions the version.
 
 Do not regenerate from a tree that was patched by hand. With the package in use
 the driver tree is always pristine; compare the file with its `.bak`:

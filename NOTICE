@@ -41,9 +41,9 @@ They are redistributed unmodified in source/pristine/, and with this project's
 modifications in source/patched/. The modifications are the original work
 described under (1).
 
-The unified diffs (patch/p104-gen2.patch, patch/final.patch and
-patch/diffs/*.diff) quote lines from those files as diff context. The quoted
-lines remain NVIDIA's under the same MIT terms.
+The unified diffs (patch/p104-gen2.patch and patch/diffs/*.diff) quote lines
+from those files as diff context. The quoted lines remain NVIDIA's under the
+same MIT terms.
 
 The MIT text that applies to both classes is reproduced verbatim in the header
 of every affected NVIDIA file and in LICENSE.
