@@ -1,7 +1,18 @@
 # nvidia-p104-gen2
 
-A reproducible fix for the PCIe bandwidth limit on the NVIDIA P104-100 mining
-card, shipped as a small Debian package plus everything needed to rebuild it.
+A reproducible fix for the PCIe bandwidth limit on the NVIDIA P104-100 mining card, shipped as a small Debian package plus everything needed to rebuild it.
+
+Unlocking PCIe Gen2 nearly doubles the PCIe bandwidth for:
+* **Faster AI model loading**
+* **Quicker data transfers**
+
+While other solutions rely on separate background programs, manual boot scripts, or modifying closed-source driver files, this project takes a "set it and forget it" approach built straight into standard Ubuntu/Debian packaging:
+
+* **Survives system and kernel updates:** Once installed, the fix automatically rebuilds itself whenever your Linux kernel updates—no manual re-applying required.
+* **Works out of the box at boot:** Everything runs inside the standard NVIDIA driver itself, so there are no extra background apps to manage or custom startup scripts to maintain.
+* **Safe and easy to undo:** It leaves your original NVIDIA driver files untouched and can be completely removed at any time with a single `dpkg -r` command.
+* **Easy to update for newer drivers:** Everything needed to rebuild the package for future NVIDIA driver versions is included right in the repository.
+
 
 ## Introduction
 
