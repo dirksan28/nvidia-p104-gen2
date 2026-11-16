@@ -163,15 +163,19 @@ nvidia-p104-gen2/
 
 The stock capture and the DKMS build logs from the reference machine are not
 shipped: they are machine-specific and `tools/dump.sh` / a normal DKMS build
-regenerate them (`baseline/` and `logs/` are ignored by git if you create
+generate them (`baseline/` and `logs/` are ignored by git if you create
 them). The `.deb` is a build output and is ignored as well — `deb/REBUILD.md`
 produces it. A fresh clone contains everything needed to rebuild both the
 patch and the package.
 
 ## References to similar projects and approaches
-- https://github.com/skbskhud/p104-unlock-v3/tree/main https://github.com/skbskhud/p104-gen2-unlock
-- https://github.com/dartraiden/NVIDIA-patcher
-- https://github.com/WJNKAC/nvidia-p104-unlock-gen2-for-linux
+
+| Link | Brief description |
+|---|---|
+| https://github.com/skbskhud/p104-unlock-v3/tree/main | Windows 10/11 x64 project; useful reference for the same underlying Gen1→Gen2 issue. Its `docs/09-物理层实测记录-2026-10-31.md` and `docs/evidence/` files are especially good sources for register-level detail and measured behavior. |
+| https://github.com/skbskhud/p104-gen2-unlock | Related P104-100 Gen2 unlock project; useful for cross-checking the observed Gen1→Gen2 behavior and recovery pattern. |
+| https://github.com/dartraiden/NVIDIA-patcher | General NVIDIA patching project for driver and GPU configuration workarounds. |
+| https://github.com/WJNKAC/nvidia-p104-unlock-gen2-for-linux | Linux-focused P104-100 Gen2 unlock implementation, useful for comparing the Linux-side approach to the Windows references. |
 
 ## License
 
