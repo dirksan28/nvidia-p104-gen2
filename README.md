@@ -168,6 +168,11 @@ them). The `.deb` is a build output and is ignored as well — `deb/REBUILD.md`
 produces it. A fresh clone contains everything needed to rebuild both the
 patch and the package.
 
+## References to similar projects and approaches
+- https://github.com/skbskhud/p104-unlock-v3/tree/main https://github.com/skbskhud/p104-gen2-unlock
+- https://github.com/dartraiden/NVIDIA-patcher
+- https://github.com/WJNKAC/nvidia-p104-unlock-gen2-for-linux
+
 ## License
 
 MIT — see `LICENSE`.
