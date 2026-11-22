@@ -1,7 +1,9 @@
 # nvidia-p104-gen2
 
 A reproducible fix for the PCIe bandwidth limit on the NVIDIA P104-100 mining card, shipped as a small Debian package plus everything needed to rebuild it.
-
+<br>
+<img width="70%" alt="nvtop" src="https://github.com/user-attachments/assets/5fc025d4-07a3-4c11-8fcc-41651049fdaa" />
+<br>
 Unlocking PCIe Gen2 nearly doubles the PCIe bandwidth for:
 * **Faster AI model loading**
 * **Quicker data transfers**
